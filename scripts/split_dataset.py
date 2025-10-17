@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 import csv
 import shutil
 from collections import defaultdict
@@ -11,16 +10,16 @@ from PIL import Image
 
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
-RAW_IMAGES_DIR = ROOT_DIR / "data" / "raw" / "images"
-ANNOTATIONS_DIR = ROOT_DIR / "data" / "raw" / "annotations"
-
-TRAIN_LIST = ANNOTATIONS_DIR / "trainval.txt"
+RAW_DIR = ROOT_DIR / "data" / "raw"
+IMAGES_DIR = RAW_DIR / "images"
+ANNOTATIONS_DIR = RAW_DIR / "annotations"
+TRAINVAL_LIST = ANNOTATIONS_DIR / "trainval.txt"
 TEST_LIST = ANNOTATIONS_DIR / "test.txt"
-METADATA_LIST = ANNOTATIONS_DIR / "list.txt"
 
 TRAIN_DIR = ROOT_DIR / "data" / "train"
 VAL_DIR = ROOT_DIR / "data" / "val"
 TEST_DIR = ROOT_DIR / "data" / "test"
+
 TRAIN_LABELS = ROOT_DIR / "data" / "train_labels.csv"
 VAL_LABELS = ROOT_DIR / "data" / "val_labels.csv"
 TEST_LABELS = ROOT_DIR / "data" / "test_labels.csv"
@@ -28,90 +27,60 @@ TEST_LABELS = ROOT_DIR / "data" / "test_labels.csv"
 IMAGE_SIZE = (224, 224)
 
 
-def read_metadata() -> Dict[str, Dict[str, int | str]]:
-    metadata: Dict[str, Dict[str, int | str]] = {}
-    pattern = re.compile(r"_[0-9]+$")
-
-    with open(METADATA_LIST, "r", encoding="utf-8") as file:
-        for line in file:
-            if not line or line.startswith("#"):
-                continue
-            parts = line.strip().split()
-            if len(parts) < 4:
-                continue
-            name, class_id, species, breed_id = parts[:4]
-            class_name = pattern.sub("", name)
-            metadata[name] = {
-                "class_id": int(class_id),
-                "species": int(species),
-                "breed_id": int(breed_id),
-                "class_name": class_name,
-            }
-    return metadata
+def ensure_clean_dir(path: Path) -> None:
+    if path.exists():
+        shutil.rmtree(path)
+    path.mkdir(parents=True, exist_ok=True)
 
 
 def read_split(file_path: Path) -> List[str]:
     names: List[str] = []
-    with open(file_path, "r", encoding="utf-8") as file:
-        for line in file:
-            stripped = line.strip()
-            if not stripped:
+    with open(file_path, "r", encoding="utf-8") as handle:
+        for raw in handle:
+            raw = raw.strip()
+            if not raw:
                 continue
-            names.append(stripped.split()[0])
+            names.append(raw.split()[0])
     return names
 
 
-def ensure_clean_dir(directory: Path) -> None:
-    if directory.exists():
-        shutil.rmtree(directory)
-    directory.mkdir(parents=True, exist_ok=True)
+def read_metadata() -> Dict[str, Dict[str, str]]:
+    labels: Dict[str, Dict[str, str]] = {}
+    with open(ANNOTATIONS_DIR / "list.txt", "r", encoding="utf-8") as handle:
+        for raw in handle:
+            if not raw or raw.startswith("#"):
+                continue
+            parts = raw.strip().split()
+            if len(parts) < 4:
+                continue
+            name, class_id, species, breed_id = parts[:4]
+            labels[name] = {
+                "class_id": class_id,
+                "species": species,
+                "breed_id": breed_id,
+                "class_name": name.rsplit("_", 1)[0],
+            }
+    return labels
 
 
-def split_test_set(test_names: Iterable[str], metadata: Dict[str, Dict[str, int | str]]) -> Tuple[List[str], List[str]]:
-    per_class: Dict[str, List[str]] = defaultdict(list)
-    for name in test_names:
-        class_name = str(metadata[name]["class_name"])
-        per_class[class_name].append(name)
-
-    val_split: List[str] = []
-    remaining_test: List[str] = []
-
-    for class_name, entries in per_class.items():
-        entries.sort()
-        mid = len(entries) // 2
-        val_split.extend(entries[:mid])
-        remaining_test.extend(entries[mid:])
-
-    return val_split, remaining_test
-
-
-def resize_and_save(image_name: str, destination: Path) -> None:
-    source = RAW_IMAGES_DIR / f"{image_name}.jpg"
-    if not source.exists():
-        raise FileNotFoundError(f"Missing image file: {source}")
+def resize_and_copy(image_name: str, destination: Path) -> None:
+    src = IMAGES_DIR / f"{image_name}.jpg"
+    if not src.exists():
+        png = IMAGES_DIR / f"{image_name}.png"
+        if png.exists():
+            src = png
+        else:
+            raise FileNotFoundError(f"Missing source image for {image_name}")
 
     destination.parent.mkdir(parents=True, exist_ok=True)
-
-    with Image.open(source) as img:
-        resized = img.convert("RGB").resize(IMAGE_SIZE, Image.BILINEAR)
-        resized.save(destination, format="JPEG", quality=95)
-
-
-def copy_split(
-    names: Iterable[str], metadata: Dict[str, Dict[str, int | str]], destination_root: Path
-) -> None:
-    for name in names:
-        target = destination_root / f"{name}.jpg"
-        resize_and_save(name, target)
+    with Image.open(src) as img:
+        img = img.convert("RGB").resize(IMAGE_SIZE, Image.BILINEAR)
+        img.save(destination, format="JPEG", quality=95)
 
 
-def write_split_metadata(
-    names: Iterable[str],
-    metadata: Dict[str, Dict[str, int | str]],
-    destination: Path,
-) -> None:
-    with open(destination, "w", newline="", encoding="utf-8") as file:
-        writer = csv.writer(file)
+def write_labels(names: Iterable[str], metadata: Dict[str, Dict[str, str]], path: Path) -> None:
+    with open(path, "w", newline="", encoding="utf-8") as handle:
+        writer = csv.writer(handle)
         writer.writerow(["image", "class_name", "class_id", "species", "breed_id"])
         for name in names:
             info = metadata[name]
@@ -126,28 +95,52 @@ def write_split_metadata(
             )
 
 
-def main() -> None:
+def populate_split(names: Iterable[str], metadata: Dict[str, Dict[str, str]], directory: Path) -> None:
+    for name in names:
+        resize_and_copy(name, directory / f"{name}.jpg")
+
+
+def split_test(names: List[str], metadata: Dict[str, Dict[str, str]]) -> Tuple[List[str], List[str]]:
+    grouped: Dict[str, List[str]] = defaultdict(list)
+    for name in names:
+        grouped[metadata[name]["class_name"]].append(name)
+
+    val_split: List[str] = []
+    remaining_test: List[str] = []
+
+    for class_names, entries in grouped.items():
+        entries.sort()
+        mid = len(entries) // 2
+        val_split.extend(entries[:mid])
+        remaining_test.extend(entries[mid:])
+
+    return val_split, remaining_test
+
+
+def main() -> int:
     metadata = read_metadata()
-    train_names = read_split(TRAIN_LIST)
+
+    train_names = read_split(TRAINVAL_LIST)
     test_names = read_split(TEST_LIST)
+    val_names, remaining_test_names = split_test(test_names, metadata)
 
-    for directory in (TRAIN_DIR, VAL_DIR, TEST_DIR):
-        ensure_clean_dir(directory)
+    ensure_clean_dir(TRAIN_DIR)
+    ensure_clean_dir(VAL_DIR)
+    ensure_clean_dir(TEST_DIR)
 
-    val_names, remaining_test_names = split_test_set(test_names, metadata)
+    populate_split(train_names, metadata, TRAIN_DIR)
+    populate_split(val_names, metadata, VAL_DIR)
+    populate_split(remaining_test_names, metadata, TEST_DIR)
 
-    copy_split(train_names, metadata, TRAIN_DIR)
-    copy_split(val_names, metadata, VAL_DIR)
-    copy_split(remaining_test_names, metadata, TEST_DIR)
+    write_labels(train_names, metadata, TRAIN_LABELS)
+    write_labels(val_names, metadata, VAL_LABELS)
+    write_labels(remaining_test_names, metadata, TEST_LABELS)
 
-    write_split_metadata(train_names, metadata, TRAIN_LABELS)
-    write_split_metadata(val_names, metadata, VAL_LABELS)
-    write_split_metadata(remaining_test_names, metadata, TEST_LABELS)
-
-    print(f"Prepared {len(train_names)} training images in {TRAIN_DIR}")
-    print(f"Prepared {len(val_names)} validation images in {VAL_DIR}")
-    print(f"Prepared {len(remaining_test_names)} test images in {TEST_DIR}")
+    print(
+        f"Prepared train={len(train_names)} val={len(val_names)} test={len(remaining_test_names)}"
+    )
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

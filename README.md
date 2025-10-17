@@ -1,0 +1,76 @@
+
+# Image Classification with RegNet
+
+This project trains a RegNetY-016 model (via [timm](https://github.com/huggingface/pytorch-image-models)) on the Oxford-IIIT Pet dataset. The repository includes scripts for downloading the data, preprocessing into flattened splits with CSV annotations, training/validation pipelines, and a demo subset.
+
+## Project Structure
+
+```
+configs/              # YAML configs for model, training, data, and augmentation
+scripts/              # Utility scripts (download data, preprocess, demo subset)
+src/                  # Training code: data loaders, engine, models, utils
+train.py              # CLI entry point for training
+validate.py           # CLI entry point for evaluation
+demo/                 # Optional mini dataset (created via scripts/create_demo_dataset.py)
+notebooks/            # Jupyter notebooks
+```
+
+## Setup
+
+1. Install dependencies (PyTorch build of your choice, plus utility packages):
+
+```bash
+pip install -r requirements.txt
+```
+
+2. Download the dataset and prepare splits:
+
+```bash
+python scripts/get_data.py
+python scripts/split_dataset.py
+```
+
+3. (Optional) Create a tiny demo split (first two classes, 20/5/5 samples):
+
+```bash
+python scripts/create_demo_dataset.py
+```
+
+## Training
+
+Run training with defaults (RegNetY-016, full dataset):
+
+```bash
+python train.py
+```
+
+Key options:
+
+- `--model-config`, `--data-config`, `--train-config`, `--aug-config`: override YAML paths
+- `--epochs`, `--batch-size`, `--device`: override hyperparameters from train config
+- `--resume`: path to `last.pt` or another checkpoint to resume
+- `--amp`: `on`/`off`/`auto` for mixed precision (default `auto`)
+
+Checkpoints are stored under `checkpoints/` (customizable via config or `--output-dir`).
+
+## Validation
+
+Evaluate a checkpoint on a split (val/test/demo):
+
+```bash
+python validate.py --checkpoint checkpoints/regnety_016/best.pth --split val
+```
+
+You can point `--data-config` to a custom YAML (for example, one targeting the `demo/` dataset) to evaluate on different splits.
+
+## Notebook
+
+`notebooks/image_classification.ipynb` demonstrates the end-to-end workflow:
+
+- Environment setup & dependency installation
+- Dataset download and preprocessing
+- Launching training via the CLI
+- Evaluating and inspecting predictions
+
+Open it in Jupyter or VS Code for an interactive walkthrough.
+

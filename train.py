@@ -1,0 +1,130 @@
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any, Dict
+
+import torch
+from torch.utils.data import DataLoader
+
+from src.config import load_configs, to_namespace
+from src.data import ImageClassificationDataset
+from src.engine import fit
+from src.models import create_model
+from src.utils import get_device, seed_all
+from src.utils.checkpoint import load_checkpoint, save_checkpoint
+from src.utils.cli import parse_train_args
+
+
+def create_loader(
+    split_cfg: Dict[str, str],
+    *,
+    batch_size: int,
+    num_workers: int,
+    device: torch.device,
+    augment_cfg: Dict[str, Any] | None,
+    train: bool,
+) -> DataLoader:
+    dataset = ImageClassificationDataset(
+        split_cfg["images"],
+        split_cfg["labels"],
+        train=train,
+        augment_config=augment_cfg,
+    )
+    return DataLoader(
+        dataset,
+        batch_size=batch_size,
+        shuffle=train,
+        num_workers=num_workers,
+        pin_memory=device.type == "cuda",
+    )
+
+
+def main() -> int:
+    args = parse_train_args()
+
+    config_paths = [
+        args.train_config,
+        args.data_config,
+        args.model_config,
+        args.aug_config,
+    ]
+    config = load_configs(config_paths)
+
+    if "seed" in config:
+        seed_all(int(config["seed"]))
+
+    model_cfg = to_namespace(config["model"])
+    train_cfg = config.get("train", {})
+    data_cfg = config["data"]
+    augment_cfg = config.get("augment")
+
+    batch_size = args.batch_size or int(train_cfg.get("batch_size", 32))
+    epochs = args.epochs or int(train_cfg.get("epochs", 10))
+    lr = float(train_cfg.get("lr", 5e-4))
+    weight_decay = float(train_cfg.get("weight_decay", 1e-4))
+    num_workers = int(train_cfg.get("num_workers", 4))
+    label_smoothing = float(train_cfg.get("label_smoothing", 0.1))
+    log_interval = train_cfg.get("log_interval")
+
+    device_name = args.device or get_device(train_cfg.get("device_preference"))
+    device = torch.device(device_name)
+
+    if args.amp == "auto":
+        amp = bool(train_cfg.get("amp", device.type == "cuda"))
+    else:
+        amp = args.amp == "on"
+
+    output_dir = Path(args.output_dir or train_cfg.get("output_dir", "checkpoints"))
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    train_loader = create_loader(
+        data_cfg["train"],
+        batch_size=batch_size,
+        num_workers=num_workers,
+        device=device,
+        augment_cfg=augment_cfg,
+        train=True,
+    )
+    val_loader = create_loader(
+        data_cfg["val"],
+        batch_size=batch_size,
+        num_workers=num_workers,
+        device=device,
+        augment_cfg=augment_cfg,
+        train=False,
+    )
+
+    model = create_model(model_cfg)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
+
+    start_epoch = 0
+    best_acc = 0.0
+    if args.resume:
+        start_epoch, best_acc = load_checkpoint(args.resume, model, optimizer, device)
+        print(
+            f"Resumed from {args.resume} at epoch {start_epoch} "
+            f"with best accuracy {best_acc:.4f}"
+        )
+
+    best = fit(
+        model,
+        train_loader,
+        val_loader,
+        optimizer,
+        epochs=epochs,
+        device=device,
+        save_dir=output_dir,
+        amp=amp,
+        start_epoch=start_epoch,
+        best_accuracy=best_acc,
+        label_smoothing=label_smoothing,
+        log_interval=log_interval,
+    )
+
+    save_checkpoint(model, optimizer, epochs, best, output_dir / "last.pt")
+    print(f"Training complete. Best validation accuracy: {best * 100:.2f}%")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
