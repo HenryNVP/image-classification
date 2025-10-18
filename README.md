@@ -68,7 +68,7 @@ You can point `--data-config` to a custom YAML (for example, one targeting the `
 
 ## Exporting
 
-Convert a trained model to TorchScript and ONNX:
+Convert a trained model to TorchScript and ONNX (TorchScript embeds a center crop; ONNX expects pre-cropped inputs):
 
 ```bash
 python scripts/export_models.py --checkpoint checkpoints/regnety_016/best.pth \
@@ -76,6 +76,14 @@ python scripts/export_models.py --checkpoint checkpoints/regnety_016/best.pth \
 ```
 
 TorchScript exports include an in-graph center crop (size inferred from `configs/aug.yaml`), while the ONNX export expects inputs already cropped to that size.
+
+Benchmark raw PyTorch, TorchScript, and ONNX runtime performance (FPS, latency):
+
+```bash
+python scripts/benchmark_models.py --checkpoint checkpoints/regnety_016/best.pth \
+    --torchscript exports/regnety_016/model_scripted.pt \
+    --onnx exports/regnety_016/model.onnx --device cuda
+```
 
 ## Notebook
 

@@ -6,3 +6,4 @@ numpy
 Pillow
 PyYAML
 scikit-learn
+onnxruntime
