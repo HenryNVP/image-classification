@@ -21,4 +21,10 @@ def create_model(cfg):
     else:
         raise RuntimeError("Unable to determine classifier head dimensions.")
 
+    if getattr(cfg, "freeze_backbone", False):
+        for name, param in m.named_parameters():
+            if any(head_name in name for head_name in ("head", "fc", "classifier")):
+                continue
+            param.requires_grad = False
+
     return m
