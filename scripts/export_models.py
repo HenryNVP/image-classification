@@ -1,10 +1,15 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
 from typing import Any, Dict, Tuple
 
 import torch
+
+ROOT_DIR = Path(__file__).resolve().parents[1]
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
 
 from src.config import load_configs, to_namespace
 from src.models import create_model
@@ -77,14 +82,15 @@ def infer_sizes(augment_cfg: Dict[str, Any] | None, fallback: int = 224) -> Tupl
         random_crop = train_cfg.get("random_resized_crop")
         if isinstance(random_crop, dict):
             crop_size = int(random_crop.get("size", crop_size))
-        elif isinstance(random_crop, (int, float)):
+        elif isinstance(random_crop, (int, float)) and not isinstance(random_crop, bool):
             crop_size = int(random_crop)
 
         eval_cfg = augment_cfg.get("eval", {})
         center_crop = eval_cfg.get("center_crop")
-        if isinstance(center_crop, (int, float)):
+        if isinstance(center_crop, (int, float)) and not isinstance(center_crop, bool):
             crop_size = int(center_crop)
 
+    crop_size = max(1, crop_size)
     return input_size, crop_size
 
 
@@ -96,12 +102,8 @@ class CenterCropModule(torch.nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         th = tw = self.size
         h, w = x.shape[-2:]
-        if h < th or w < tw:
-            raise RuntimeError(
-                f"Input spatial dims ({h}, {w}) smaller than crop size {self.size}."
-            )
-        if h == th and w == tw:
-            return x
+        th = min(th, h)
+        tw = min(tw, w)
         i = (h - th) // 2
         j = (w - tw) // 2
         return x[..., i : i + th, j : j + tw]
@@ -123,12 +125,13 @@ def to_torchscript(
     model_cfg: Any,
     device: torch.device,
     input_size: int,
+    crop_size: int,
 ) -> None:
     model = create_model(model_cfg).to(device)
     load_checkpoint_weights(model, checkpoint, device)
     model.eval()
 
-    export_model = torch.nn.Sequential(CenterCropModule(input_size), model)
+    export_model = torch.nn.Sequential(CenterCropModule(crop_size), model)
     dummy_input = torch.randn(1, 3, input_size, input_size, device=device)
     export_torchscript(export_model, dummy_input, output_path)
 
@@ -175,18 +178,19 @@ def main() -> int:
     load_checkpoint_weights(model, args.checkpoint, device)
     model.eval()
 
-    export_model: torch.nn.Module = torch.nn.Sequential(CenterCropModule(crop_size), model)
-
     output_dir = args.output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    dummy_input = torch.randn(1, 3, input_size, input_size, device=device)
-
+    # TorchScript export (includes center crop wrapper)
+    ts_model = torch.nn.Sequential(CenterCropModule(crop_size), model)
+    ts_dummy = torch.randn(1, 3, input_size, input_size, device=device)
     ts_path = output_dir / "model_scripted.pt"
-    export_torchscript(export_model, dummy_input, ts_path)
+    export_torchscript(ts_model, ts_dummy, ts_path)
 
+    # ONNX export expects already-cropped inputs
+    onnx_dummy = torch.randn(1, 3, crop_size, crop_size, device=device)
     onnx_path = output_dir / "model.onnx"
-    export_onnx(export_model, dummy_input, onnx_path, 13)
+    export_onnx(model, onnx_dummy, onnx_path, 13)
 
     return 0
 

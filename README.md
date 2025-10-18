@@ -75,7 +75,7 @@ python scripts/export_models.py --checkpoint checkpoints/regnety_016/best.pth \
     --output-dir exports/regnety_016
 ```
 
-The exporter automatically center-crops inputs using the size in `configs/aug.yaml` (typically 224) before running the model, and emits both TorchScript (`model_scripted.pt`) and ONNX (`model.onnx`).
+TorchScript exports include an in-graph center crop (size inferred from `configs/aug.yaml`), while the ONNX export expects inputs already cropped to that size.
 
 ## Notebook
 
