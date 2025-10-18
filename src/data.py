@@ -97,11 +97,27 @@ def build_transforms(
     ops: List[Any] = []
 
     size = cfg.get("size")
-    if size:
-        ops.append(transforms.Resize((size, size)))
 
     if train:
         train_cfg = cfg.get("train", {})
+        rrc_cfg = train_cfg.get("random_resized_crop")
+        if rrc_cfg:
+            if isinstance(rrc_cfg, dict):
+                crop_size = int(rrc_cfg.get("size", 224))
+                scale = tuple(rrc_cfg.get("scale", (0.8, 1.0)))
+                ratio = tuple(rrc_cfg.get("ratio", (3 / 4, 4 / 3)))
+                ops.append(
+                    transforms.RandomResizedCrop(
+                        crop_size,
+                        scale=scale,  # type: ignore[arg-type]
+                        ratio=ratio,  # type: ignore[arg-type]
+                    )
+                )
+            else:
+                ops.append(transforms.RandomResizedCrop(int(rrc_cfg)))
+        elif size:
+            ops.append(transforms.Resize((size, size)))
+
         if train_cfg.get("random_horizontal_flip", True):
             ops.append(transforms.RandomHorizontalFlip())
         jitter_cfg = train_cfg.get("color_jitter")
@@ -109,6 +125,8 @@ def build_transforms(
             ops.append(transforms.ColorJitter(**jitter_cfg))
     else:
         eval_cfg = cfg.get("eval", {})
+        if size:
+            ops.append(transforms.Resize((size, size)))
         if eval_cfg.get("center_crop") and size:
             ops.append(transforms.CenterCrop(size))
 
