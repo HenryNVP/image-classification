@@ -1,10 +1,10 @@
 data:
   train:
-    images: demo/train
-    labels: demo/train_labels.csv
+    images: data/train
+    labels: data/train_labels.csv
   val:
-    images: demo/val
-    labels: demo/val_labels.csv
+    images: data/val
+    labels: data/val_labels.csv
   test:
-    images: demo/test
-    labels: demo/test_labels.csv
+    images: data/test
+    labels: data/test_labels.csv
