@@ -2,7 +2,12 @@ import timm, torch.nn as nn
 
 def create_model(cfg):
     # timm.create_model wrapper
-    m = timm.create_model(cfg.name, pretrained=cfg.pretrained, num_classes=cfg.num_classes)
+    m = timm.create_model(
+        cfg.name,
+        pretrained=cfg.pretrained,
+        num_classes=cfg.num_classes,
+        scriptable=getattr(cfg, "scriptable", False),
+    )
 
     in_features = None
     if getattr(m, "get_classifier", None):

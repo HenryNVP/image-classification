@@ -91,4 +91,10 @@ def parse_validate_args() -> argparse.Namespace:
     )
     parser.add_argument("--batch-size", type=int, default=None, help="Override batch size.")
     parser.add_argument("--device", type=str, default=None, help="Override device selection.")
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=None,
+        help="Optional path to save metrics JSON (defaults to checkpoint path with .metrics.json).",
+    )
     return parser.parse_args()
