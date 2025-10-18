@@ -66,6 +66,17 @@ python validate.py --checkpoint checkpoints/regnety_016/best.pth --split val
 
 You can point `--data-config` to a custom YAML (for example, one targeting the `demo/` dataset) to evaluate on different splits.
 
+## Exporting
+
+Convert a trained model to TorchScript and ONNX:
+
+```bash
+python scripts/export_models.py --checkpoint checkpoints/regnety_016/best.pth \
+    --output-dir exports/regnety_016
+```
+
+The exporter automatically center-crops inputs using the size in `configs/aug.yaml` (typically 224) before running the model, and emits both TorchScript (`model_scripted.pt`) and ONNX (`model.onnx`).
+
 ## Notebook
 
 `notebooks/image_classification.ipynb` demonstrates the end-to-end workflow:
