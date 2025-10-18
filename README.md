@@ -50,6 +50,9 @@ Key options:
 - `--epochs`, `--batch-size`, `--device`: override hyperparameters from train config
 - `--resume`: path to `last.pt` or another checkpoint to resume
 - `--amp`: `on`/`off`/`auto` for mixed precision (default `auto`)
+- `--plot`: save `training_curves.png` alongside `history.json`
+
+Early stopping defaults are defined in `configs/train.yaml` (`early_stopping.patience`, `min_delta`). Set `patience` to `null` (or remove the block) to disable it.
 
 Checkpoints are stored under `checkpoints/` (customizable via config or `--output-dir`).
 
@@ -73,4 +76,3 @@ You can point `--data-config` to a custom YAML (for example, one targeting the `
 - Evaluating and inspecting predictions
 
 Open it in Jupyter or VS Code for an interactive walkthrough.
-

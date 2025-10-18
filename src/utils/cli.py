@@ -48,6 +48,11 @@ def parse_train_args() -> argparse.Namespace:
         default="auto",
         help="Automatic mixed precision setting.",
     )
+    parser.add_argument(
+        "--plot",
+        action="store_true",
+        help="Generate training curves (loss/accuracy) at the end of training.",
+    )
     return parser.parse_args()
 
 

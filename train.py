@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any, Dict
 
 import torch
+from matplotlib import pyplot as plt
 from torch.utils.data import DataLoader
 
 from src.config import load_configs, to_namespace
@@ -65,6 +67,10 @@ def main() -> int:
     num_workers = int(train_cfg.get("num_workers", 4))
     label_smoothing = float(train_cfg.get("label_smoothing", 0.1))
     log_interval = train_cfg.get("log_interval")
+    early_cfg = train_cfg.get("early_stopping", {})
+    patience = early_cfg.get("patience")
+    patience = int(patience) if patience is not None else None
+    min_delta = float(early_cfg.get("min_delta", 0.0)) if early_cfg else 0.0
 
     device_name = args.device or get_device(train_cfg.get("device_preference"))
     device = torch.device(device_name)
@@ -106,7 +112,7 @@ def main() -> int:
             f"with best accuracy {best_acc:.4f}"
         )
 
-    best = fit(
+    best, history = fit(
         model,
         train_loader,
         val_loader,
@@ -119,11 +125,60 @@ def main() -> int:
         best_accuracy=best_acc,
         label_smoothing=label_smoothing,
         log_interval=log_interval,
+        early_stopping_patience=patience,
+        early_stopping_min_delta=min_delta,
     )
 
     save_checkpoint(model, optimizer, epochs, best, output_dir / "last.pt")
-    print(f"Training complete. Best validation accuracy: {best * 100:.2f}%")
+    actual_epochs = history[-1]["epoch"] if history else 0
+    print(
+        f"Training complete after {actual_epochs} epochs. "
+        f"Best validation accuracy: {best * 100:.2f}%"
+    )
+
+    history_path = output_dir / "history.json"
+    history_path.write_text(json.dumps(history, indent=2))
+    print(f"Saved training history to {history_path}")
+
+    if args.plot and history:
+        plot_history(history, output_dir)
+
     return 0
+
+
+def plot_history(history: list[dict], output_dir: Path) -> None:
+    epochs = [entry["epoch"] for entry in history]
+    train_loss = [entry["train_loss"] for entry in history]
+    val_loss = [entry["val_loss"] for entry in history]
+    train_acc = [entry["train_acc"] for entry in history]
+    val_acc = [entry["val_acc"] for entry in history]
+
+    try:
+        plt.style.use("seaborn-v0_8")
+    except OSError:
+        pass
+    fig, axes = plt.subplots(1, 2, figsize=(12, 4))
+
+    axes[0].plot(epochs, train_loss, label="Train")
+    axes[0].plot(epochs, val_loss, label="Val")
+    axes[0].set_title("Loss")
+    axes[0].set_xlabel("Epoch")
+    axes[0].set_ylabel("Cross-Entropy")
+    axes[0].legend()
+
+    axes[1].plot(epochs, [acc * 100 for acc in train_acc], label="Train")
+    axes[1].plot(epochs, [acc * 100 for acc in val_acc], label="Val")
+    axes[1].set_title("Accuracy")
+    axes[1].set_xlabel("Epoch")
+    axes[1].set_ylabel("Top-1 Accuracy (%)")
+    axes[1].legend()
+
+    fig.tight_layout()
+    output_dir.mkdir(parents=True, exist_ok=True)
+    plot_path = output_dir / "training_curves.png"
+    fig.savefig(plot_path, dpi=200)
+    plt.close(fig)
+    print(f"Saved training curves to {plot_path}")
 
 
 if __name__ == "__main__":

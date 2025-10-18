@@ -9,3 +9,6 @@ train:
   output_dir: checkpoints/regnety_016
   amp: true
   label_smoothing: 0.1
+  early_stopping:
+    patience: 3
+    min_delta: 0.0

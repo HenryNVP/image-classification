@@ -24,7 +24,7 @@ TRAIN_LABELS = ROOT_DIR / "data" / "train_labels.csv"
 VAL_LABELS = ROOT_DIR / "data" / "val_labels.csv"
 TEST_LABELS = ROOT_DIR / "data" / "test_labels.csv"
 
-IMAGE_SIZE = (224, 224)
+IMAGE_SIZE = (256, 256)
 
 
 def ensure_clean_dir(path: Path) -> None:
