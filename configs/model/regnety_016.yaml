@@ -2,7 +2,6 @@ model:
   name: regnety_016
   pretrained: true
   num_classes: 37
-  scriptable: true
   freeze_backbone: true
 
 seed: 42

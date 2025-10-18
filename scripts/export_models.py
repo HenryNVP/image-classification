@@ -117,6 +117,22 @@ def export_torchscript(model: torch.nn.Module, dummy_input: torch.Tensor, path: 
     print(f"Saved TorchScript model to {path}")
 
 
+def to_torchscript(
+    checkpoint: Path,
+    output_path: Path,
+    model_cfg: Any,
+    device: torch.device,
+    input_size: int,
+) -> None:
+    model = create_model(model_cfg).to(device)
+    load_checkpoint_weights(model, checkpoint, device)
+    model.eval()
+
+    export_model = torch.nn.Sequential(CenterCropModule(input_size), model)
+    dummy_input = torch.randn(1, 3, input_size, input_size, device=device)
+    export_torchscript(export_model, dummy_input, output_path)
+
+
 def export_onnx(
     model: torch.nn.Module,
     dummy_input: torch.Tensor,
