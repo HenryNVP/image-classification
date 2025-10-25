@@ -44,6 +44,12 @@ Run training with defaults (RegNetY-016, full dataset):
 python train.py
 ```
 
+For Vision Transformer models that require 224x224 inputs:
+
+```bash
+python train.py --model-config configs/model/vit_base_patch16_224.yaml --aug-config configs/aug_vit.yaml
+```
+
 Key options:
 
 - `--model-config`, `--data-config`, `--train-config`, `--aug-config`: override YAML paths
@@ -51,6 +57,8 @@ Key options:
 - `--resume`: path to `last.pt` or another checkpoint to resume
 - `--amp`: `on`/`off`/`auto` for mixed precision (default `auto`)
 - `--plot`: save `training_curves.png` alongside `history.json`
+
+**Note:** Vision Transformer models have strict input size requirements. Use `configs/aug_vit.yaml` (224x224) for ViT models instead of the default `configs/aug.yaml` (256x256).
 
 Early stopping defaults are defined in `configs/train.yaml` (`early_stopping.patience`, `min_delta`). Set `patience` to `null` (or remove the block) to disable it.
 
