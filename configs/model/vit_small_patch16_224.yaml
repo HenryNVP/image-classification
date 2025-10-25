@@ -1,0 +1,8 @@
+model:
+  name: vit_small_patch16_224.dino
+  pretrained: true
+  num_classes: 37
+  freeze_backbone: false  # Train the entire model
+
+seed: 42
+

@@ -58,7 +58,6 @@ Key options:
 - `--amp`: `on`/`off`/`auto` for mixed precision (default `auto`)
 - `--plot`: save `training_curves.png` alongside `history.json`
 
-**Note:** Vision Transformer models have strict input size requirements. Use `configs/aug_vit.yaml` (224x224) for ViT models instead of the default `configs/aug.yaml` (256x256).
 
 Early stopping defaults are defined in `configs/train.yaml` (`early_stopping.patience`, `min_delta`). Set `patience` to `null` (or remove the block) to disable it.
 

@@ -1,0 +1,15 @@
+train:
+  batch_size: 256
+  epochs: 50
+  lr: 0.0001
+  weight_decay: 0.05
+  num_workers: 4
+  device_preference: cuda
+  log_interval: 10
+  output_dir: checkpoints/vit_small_patch16_224
+  amp: true
+  label_smoothing: 0.1
+  early_stopping:
+    patience: 5   # More patience for ViT
+    min_delta: 0.001
+

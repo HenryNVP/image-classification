@@ -1,7 +1,0 @@
-model:
-  name: vit_base_patch16_224.mae
-  pretrained: true
-  num_classes: 37
-  freeze_backbone: true
-
-seed: 42
