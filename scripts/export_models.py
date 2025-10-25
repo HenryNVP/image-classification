@@ -57,6 +57,12 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Device to use for export (defaults to preferred device or CPU).",
     )
+    parser.add_argument(
+        "--onnx-opset",
+        type=int,
+        default=17,
+        help="ONNX opset version (default: 17, minimum 14 for ViT models).",
+    )
     return parser.parse_args()
 
 
@@ -190,7 +196,8 @@ def main() -> int:
     # ONNX export expects already-cropped inputs
     onnx_dummy = torch.randn(1, 3, crop_size, crop_size, device=device)
     onnx_path = output_dir / "model.onnx"
-    export_onnx(model, onnx_dummy, onnx_path, 13)
+    # Use configurable opset version (default 17, ViT requires >=14 for scaled_dot_product_attention)
+    export_onnx(model, onnx_dummy, onnx_path, args.onnx_opset)
 
     return 0
 

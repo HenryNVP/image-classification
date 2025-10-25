@@ -82,6 +82,19 @@ python scripts/export_models.py --checkpoint checkpoints/regnety_016/best.pth \
     --output-dir exports/regnety_016
 ```
 
+For Vision Transformer models (requires ONNX opset ≥14, default is 17):
+
+```bash
+python scripts/export_models.py \
+    --model-config configs/model/vit_small_patch16_224.yaml \
+    --aug-config configs/aug_vit.yaml \
+    --checkpoint checkpoints/vit_small_patch16_224/best.pth \
+    --output-dir exports/vit_small_patch16_224 \
+    --onnx-opset 17
+```
+
+**Note:** The default ONNX opset version is 17. ViT models require opset ≥14 due to `scaled_dot_product_attention`. Use `--onnx-opset` to specify a different version if needed.
+
 TorchScript exports include an in-graph center crop (size inferred from `configs/aug.yaml`), while the ONNX export expects inputs already cropped to that size.
 
 Benchmark raw PyTorch, TorchScript, and ONNX runtime performance (FPS, latency):
